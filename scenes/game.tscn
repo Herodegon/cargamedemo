@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3 uid="uid://b1ay0ep3pxx8l"]
+
+[ext_resource type="PackedScene" uid="uid://lnlrcyj7p2oo" path="res://scenes/obj_cube.tscn" id="1_yqjtg"]
+[ext_resource type="PackedScene" uid="uid://b45r16egtn4eu" path="res://scenes/obj_player.tscn" id="2_lnu2h"]
+
+[node name="Game" type="Node3D"]
+
+[node name="ObjPlayer" parent="." instance=ExtResource("2_lnu2h")]
+
+[node name="ObjCube" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.98462, 0, -3.7778)
+
+[node name="ObjCube2" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.75109, 0, 1.54103)
+
+[node name="ObjCube3" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.40441, 0, 6.12373)
+
+[node name="ObjCube4" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.35643, 0, -7.57995)

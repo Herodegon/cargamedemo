@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3 uid="uid://b0w775wpb6kn3"]
+
+[ext_resource type="Script" uid="uid://bh81nu512arf" path="res://scripts/obj_wheel.gd" id="1_tb0pc"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_kfkat"]
+height = 0.5
+radius = 0.25
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_tb0pc"]
+top_radius = 0.25
+bottom_radius = 0.25
+height = 0.5
+
+[node name="ObjWheel" type="Area3D"]
+script = ExtResource("1_tb0pc")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0)
+shape = SubResource("CylinderShape3D_kfkat")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0)
+mesh = SubResource("CylinderMesh_tb0pc")
