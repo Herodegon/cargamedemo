@@ -1,11 +1,19 @@
 extends CharacterBody3D
 
 # Player Car Movement Rules:
-# Movement should be relative to the direction the front of the player car is facing
-# When pressing the acceleration button, the car should accelerate in the direction of the front of the car
-# When turning, acceleration should be applied orthogonally to the direction the car is facing depending on the direction of the turn
-# When braking, the car should decelerate in the direction of the front of the car
-# The car should not be able to move faster than max_speed
+## Movement should be relative to the direction the front of the player car is facing
+## When pressing the acceleration button, the car should accelerate in the direction of the front of the car
+## When turning, acceleration should be applied orthogonally to the direction the car is facing depending on the direction of the turn
+## When braking, the car should decelerate in the direction of the front of the car
+## The car should not be able to move faster than max_speed
+
+# TODO List:
+## Features:
+### - Add drifting mechanic
+### - Add camera shake when accelerating
+## Bugs:
+### - Car turning acceleration increases exponentially as difference between car position and velocity decreases
+### - Near zero pivot point when turning during transition from reverse to drive
 
 enum CarStates {
 	DRIVE,
@@ -30,10 +38,14 @@ var curr_state := CarStates.DRIVE
 @export var camera_offset := Vector3(0.0,10.0,0.0)
 
 @export_group("Movement")
-@export var max_speed := 50.0
+@export var max_speed := 5.0
 @export var reverse_speed := 10.0
 @export var acceleration := 10.0
-@export var turn_speed := deg_to_rad(30.0)
+@export var turn_angle := PI/6
+
+@export_group("Wheels")
+@export var wheel_radius := 0.5
+@export var wheel_width := 0.2
 
 @onready var camera := $Camera3D
 
@@ -48,11 +60,6 @@ func clear_debug_nodes() -> void:
 	for node in debug_nodes:
 		node.queue_free()
 	debug_nodes.clear()
-
-## Returns the difference between the center of the player car and the front node
-## This difference is the direction the front of the car is facing
-func get_front_vector() -> Vector3:
-	return -global_transform.basis.z.normalized()
 
 func move_camera(new_position: Vector3) -> void:
 	camera.global_transform.origin = new_position
@@ -81,18 +88,27 @@ func _physics_process(delta: float) -> void:
 
 	# Get raw input from the player
 	var raw_dir := Input.get_vector("turn_left","turn_right","brake","accelerate")
+	var input_dir := Vector3(raw_dir.x, 0.0, -raw_dir.y)
+	#var relative_input := basis * input_dir
 
 	# Calculate forward movement based on the direction the car is facing
-	var forward_dir := get_front_vector()
-	var move_dir := (forward_dir * raw_dir.y).normalized()
+	var forward_dir := -basis.z
+	var accel_dir := input_dir.z * basis.z
+	var turn_dir := input_dir.x * basis.x
 
 	var forward_velocity = velocity.dot(forward_dir)
-	change_state(forward_velocity,raw_dir.y)
+	change_state(forward_velocity,-input_dir.z)
 
-	if (raw_dir.x != 0.0):
-		var turn_rate = turn_speed * delta
+	var wheel_steering := Vector3.ZERO
+	var front_wheel := (scale.z/4.0) * forward_dir
+	var back_wheel := (scale.z/4.0) * -forward_dir
+	if (forward_velocity != 0.0 && !turn_dir.is_zero_approx()):
 		var max_turn_amount = (forward_velocity/max_speed) * 0.8
-		rotate_y(-raw_dir.x * turn_rate)
+		var steering_x = turn_dir * cos(turn_angle)
+		var steering_y = accel_dir * sin(turn_angle)
+		# Turning is perpendicular to and dependent on the direction the car is facing
+		wheel_steering = ((turn_dir + steering_x + steering_y)/forward_velocity)
+		#print("Difference: ", (180/PI)*angle_difference(atan2(wheel_steering.z, wheel_steering.x), atan2(turn_dir.z, turn_dir.x)))
 
 	# Calculate the player's velocity based on the current state
 	var player_velocity := Vector3.ZERO
@@ -101,21 +117,35 @@ func _physics_process(delta: float) -> void:
 			if (forward_velocity < 0.0):
 				player_velocity = Vector3.ZERO
 			else:
-				player_velocity = move_dir * max_speed
+				player_velocity = accel_dir * max_speed
 		CarStates.REVERSE:
-			player_velocity = move_dir * reverse_speed
+			player_velocity = accel_dir * reverse_speed
 		CarStates.NEUTRAL:
 			player_velocity = Vector3.ZERO
 
-	velocity = velocity.move_toward(player_velocity, acceleration * delta)
+	front_wheel += player_velocity + wheel_steering
+	back_wheel += player_velocity
 
-	move_camera(camera_offset + pos + Vector3(0.0, forward_velocity * 0.1, 0.0))
+	velocity = velocity.move_toward(front_wheel + back_wheel, acceleration * delta)
+
+	#move_camera(camera_offset + pos + Vector3(0.0, forward_velocity * 0.1, 0.0))
+	move_camera((1.0 * camera_offset) + pos)
 	move_and_slide()
 
+	if (curr_state == CarStates.DRIVE && forward_velocity > 0.0):
+		look_at(global_position + velocity)
+	elif (curr_state == CarStates.REVERSE || forward_velocity < 0.0):
+		look_at(global_position - velocity)
+
 	var debug_obj := [
-		velocity,
-		-global_transform.basis.x.normalized(),
-		-global_transform.basis.z.normalized(),
+		#velocity,
+		#relative_input,
+		#accel_dir,
+		#turn_dir,
+		#wheel_steering,
+		#player_velocity,
+		#-global_transform.basis.x.normalized(),
+		#-global_transform.basis.z.normalized(),
 	]
 
 	draw_debug_lines(global_transform.origin + Vector3(0.0,5.0,0.0),debug_obj,debug_colors)
