@@ -18,3 +18,33 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.40441, 0, 6.12373)
 
 [node name="ObjCube4" parent="." instance=ExtResource("1_yqjtg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.35643, 0, -7.57995)
+
+[node name="ObjCube5" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.8116, 0, 6.66663)
+
+[node name="ObjCube6" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.86037, 0, 12.1519)
+
+[node name="ObjCube7" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.6658, 9.53674e-07, -14.9042)
+
+[node name="ObjCube8" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.1732, -9.53674e-07, -3.98794)
+
+[node name="ObjCube9" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.51451, 0, -21.4601)
+
+[node name="ObjCube10" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.68, 0, 0.73667)
+
+[node name="ObjCube11" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 18.7665, 0, 9.6709)
+
+[node name="ObjCube12" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.95386, 0, 17.4391)
+
+[node name="ObjCube13" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.8669, 0, 10.7746)
+
+[node name="ObjCube14" parent="." instance=ExtResource("1_yqjtg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.1375, 0, -11.1337)

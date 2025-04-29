@@ -38,9 +38,9 @@ var curr_state := CarStates.DRIVE
 @export var camera_offset := Vector3(0.0,10.0,0.0)
 
 @export_group("Movement")
-@export var max_speed := 5.0
-@export var reverse_speed := 10.0
-@export var acceleration := 10.0
+@export var max_speed := 50.0
+@export var reverse_speed := 5.0
+@export var max_acceleration := 2.5
 @export var turn_angle := PI/6
 
 @export_group("Wheels")
@@ -96,19 +96,8 @@ func _physics_process(delta: float) -> void:
 	var accel_dir := input_dir.z * basis.z
 	var turn_dir := input_dir.x * basis.x
 
-	var forward_velocity = velocity.dot(forward_dir)
+	var forward_velocity = velocity.length()
 	change_state(forward_velocity,-input_dir.z)
-
-	var wheel_steering := Vector3.ZERO
-	var front_wheel := (scale.z/4.0) * forward_dir
-	var back_wheel := (scale.z/4.0) * -forward_dir
-	if (forward_velocity != 0.0 && !turn_dir.is_zero_approx()):
-		var max_turn_amount = (forward_velocity/max_speed) * 0.8
-		var steering_x = turn_dir * cos(turn_angle)
-		var steering_y = accel_dir * sin(turn_angle)
-		# Turning is perpendicular to and dependent on the direction the car is facing
-		wheel_steering = ((turn_dir + steering_x + steering_y)/forward_velocity)
-		#print("Difference: ", (180/PI)*angle_difference(atan2(wheel_steering.z, wheel_steering.x), atan2(turn_dir.z, turn_dir.x)))
 
 	# Calculate the player's velocity based on the current state
 	var player_velocity := Vector3.ZERO
@@ -123,10 +112,24 @@ func _physics_process(delta: float) -> void:
 		CarStates.NEUTRAL:
 			player_velocity = Vector3.ZERO
 
-	front_wheel += player_velocity + wheel_steering
+	var wheel_steering := Vector3.ZERO
+	var front_wheel := (scale.z/4.0) * forward_dir
+	var back_wheel := (scale.z/4.0) * -forward_dir
+	if (forward_velocity != 0.0 && !turn_dir.is_zero_approx()):
+		# Used to decide car handling at steering angles greater than max_turn_amount
+		#var max_turn_amount = (forward_velocity/max_speed) * 0.8
+		var steering_x = turn_dir * cos(turn_angle)
+		var steering_y = accel_dir * sin(turn_angle)
+		# Turning is perpendicular to and dependent on the direction the car is facing
+		wheel_steering = (turn_dir + steering_x + steering_y)*player_velocity.length()
+		#print("Difference: ", (180/PI)*angle_difference(atan2(wheel_steering.z, wheel_steering.x), atan2(turn_dir.z, turn_dir.x)))
+
+	front_wheel += wheel_steering
 	back_wheel += player_velocity
 
-	velocity = velocity.move_toward(front_wheel + back_wheel, acceleration * delta)
+	print("Wheel Steering: ", wheel_steering.length())
+
+	velocity = velocity.move_toward(front_wheel + back_wheel, max_acceleration * delta)
 
 	#move_camera(camera_offset + pos + Vector3(0.0, forward_velocity * 0.1, 0.0))
 	move_camera((1.0 * camera_offset) + pos)
@@ -144,6 +147,8 @@ func _physics_process(delta: float) -> void:
 		#turn_dir,
 		#wheel_steering,
 		#player_velocity,
+		#front_wheel,
+		#back_wheel,
 		#-global_transform.basis.x.normalized(),
 		#-global_transform.basis.z.normalized(),
 	]
