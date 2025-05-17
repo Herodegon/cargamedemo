@@ -36,26 +36,32 @@ var curr_state := CarStates.DRIVE
 var state_max := 30.0
 var state_min := 0.0
 
+var is_friction_enabled := true
+var is_debug_enabled := false
+
 @export_group("Camera")
 @export var camera_offset := Vector3(0.0,10.0,0.0)
 
 @export_group("Movement")
-@export var max_speed := 30.0
-@export var min_speed := -10.0
-@export var max_acceleration := 16.0
-@export var turn_angle := PI/6
-@export var friction := -0.2
-@export var drag := -0.01
+@export var max_speed := 30.0				# Highest speed possible by max gear. 		  		   Default: 30.0
+@export var min_speed := -10.0				# Lowest speed possible in reverse.   		  		   Default: -10.0
+@export var max_acceleration := 16.0		# Rate of acceleration by the car each frame. 		   Default: 16.0
+@export var turn_angle := PI/6				# Angle from front wheels where turn force is applied. Default: PI/6
+@export var turn_strength := 1.0			# Magnitude of turn angle. 							   Default: 1.0
+@export var friction := -0.2				# Force to reduce acceleration. 					   Default: -0.2
+@export var drag := -0.01					# Force to reduce acceleration as velocity increases.  Default: -0.01
 
 @onready var camera := $Camera3D
-
-var iter := 0
 
 ## Creates 3D lines in real time for visualizing velocity, acceleration, position, etc.
 ## Meshes instantiated are added to the root tree, and must be managed/freed manually
 func draw_debug_lines(obj_pos: Vector3, nodes: Array, colors: Array) -> void:
 	for i in nodes.size():
 		debug_nodes.append(DebugDrawTool.line(obj_pos, obj_pos + nodes[i], colors[i]))
+
+func draw_debug_circles(obj_pos: Vector3, radii: Array, colors: Array) -> void:
+	for i in radii.size():
+		debug_nodes.append(DebugDrawTool.circle(obj_pos, radii[i], colors[i]))
 
 ## Empty debug children each frame to prevent clutter and allow lines to be redrawn
 func clear_debug_nodes() -> void:
@@ -72,8 +78,6 @@ func calc_top_speed(input_velocity: Vector3) -> float:
 	if (delta_velocity < 0.00001):
 		return new_speed.length()
 	else:
-		print("Iter ", iter, " - ", new_speed.length())
-		iter += 1
 		return calc_top_speed(new_speed)
 
 func move_camera(new_position: Vector3) -> void:
@@ -122,7 +126,7 @@ func calc_steering(angle: float, player_turn_dir: Vector3, player_accel_dir: Vec
 	var steering_x = player_turn_dir * cos(angle)
 	var steering_y = player_accel_dir * sin(angle)
 	# Turning is perpendicular to and dependent on the direction the car is facing
-	var steering = steering_x + steering_y
+	var steering = (steering_x + steering_y) * turn_strength
 
 	return steering 
 
@@ -136,6 +140,15 @@ func calc_friction(obj_velocity: Vector3) -> Vector3:
 func _ready() -> void:
 	var top_speed := calc_top_speed(velocity)
 	print("Top Speed: ", top_speed)
+
+func _input(event: InputEvent) -> void:
+	if (event.is_pressed()):
+		if (Input.is_physical_key_pressed(KEY_F)):
+			is_friction_enabled = !is_friction_enabled
+			print("Friction: ", is_friction_enabled)
+		if (Input.is_physical_key_pressed(KEY_P)):
+			is_debug_enabled = !is_debug_enabled
+			print("Debug: ", is_debug_enabled)
 
 func _physics_process(delta: float) -> void:
 	# Reset debug nodes each frame to prevent clutter
@@ -169,19 +182,24 @@ func _physics_process(delta: float) -> void:
 	var new_heading = (front_wheel - back_wheel).normalized()
 
 	# Calculate player velocity
-	#var net_friction = calc_friction(velocity)
 	var net_friction = Vector3.ZERO
+	if (is_friction_enabled):
+		net_friction = calc_friction(velocity)
+	#var net_friction = Vector3.ZERO
 	velocity = (new_heading * prev_velocity) + (max_acceleration * accel_dir * delta) + (net_friction * delta)
 	
 	var curr_velocity = velocity.dot(forward_dir)
+	var accel_length = accel_dir.dot(basis.z)
 	if (!accel_dir.is_zero_approx()):
-		if (curr_velocity > state_max):
+		if (accel_length < 0.0 && curr_velocity > state_max):
 			print("PeePee")
 			velocity = velocity.normalized() * abs(state_max)
 		# Ensure that the car does not start at velocity of 0 when shifting to drive
-		elif (accel_dir.z > 0.0 && curr_velocity < state_min):
+		elif (accel_length > 0.0 && curr_velocity < state_min):
 			print("PooPoo")
 			velocity = velocity.normalized() * abs(state_min)
+
+	print("Dot Accel: ", accel_dir.dot(basis.z))
 
 	move_camera(camera_offset + global_position + Vector3(0.0, (velocity.length()/max_speed) * 5.0, 0.0))
 	#move_camera((1.0 * camera_offset) + global_position)
@@ -192,17 +210,24 @@ func _physics_process(delta: float) -> void:
 	elif (curr_velocity < 0.0):
 		look_at(global_position - velocity)
 
-	var debug_obj := [
-		velocity,
-		#relative_input,
-		accel_dir,
-		turn_dir,
-		wheel_steering,
-		#-global_transform.basis.x.normalized(),
-		#-global_transform.basis.z.normalized(),
-	]
+	if (is_debug_enabled):
+		var debug_obj := [
+			velocity,
+			#relative_input,
+			accel_dir,
+			turn_dir,
+			wheel_steering,
+			#-global_transform.basis.x.normalized(),
+			#-global_transform.basis.z.normalized(),
+		]
 
-	draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),debug_obj,debug_colors)
+		draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),debug_obj,debug_colors)
 
-	draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[front_wheel - global_position],[Color.GRAY])
-	draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[back_wheel - global_position],[Color.WHITE])
+		# Display the front and back wheels
+		draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[front_wheel - global_position],[Color.GRAY])
+		draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[back_wheel - global_position],[Color.WHITE])
+
+		# Display turning circles
+		var turn_velocity = velocity.length()/turn_strength
+		draw_debug_circles(global_position + (basis.x * turn_velocity),[turn_velocity],[Color.YELLOW])
+		draw_debug_circles(global_position - (basis.x * turn_velocity),[turn_velocity],[Color.GREEN])
