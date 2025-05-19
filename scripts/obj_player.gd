@@ -9,11 +9,14 @@ extends CharacterBody3D
 
 # TODO List:
 ## Features:
-### - Add drifting mechanic
-### - Add camera shake when accelerating
+### [ ] - Add drifting mechanic
+### [ ] - Add jump mechanic
+### [ ] - Add pitch spin when midair
+### [ ] - Add yaw spin when midair
+### [ ] - Add camera shake when accelerating
 ## Bugs:
-### - Car turning acceleration increases exponentially as difference between car position and velocity decreases
-### - Near zero pivot point when turning during transition from reverse to drive
+### [X] - Car turning acceleration increases exponentially as difference between car position and velocity decreases
+### [X] - Near zero pivot point when turning during transition from reverse to drive
 
 enum CarStates {
 	DRIVE,
@@ -48,6 +51,7 @@ var is_debug_enabled := false
 @export var max_acceleration := 16.0		# Rate of acceleration by the car each frame. 		   Default: 16.0
 @export var turn_angle := PI/6				# Angle from front wheels where turn force is applied. Default: PI/6
 @export var turn_strength := 1.0			# Magnitude of turn angle. 							   Default: 1.0
+@export var spin_angle := PI/6              # Angle from front wheels where spin force is applied. Default: PI/6
 @export var friction := -0.2				# Force to reduce acceleration. 					   Default: -0.2
 @export var drag := -0.01					# Force to reduce acceleration as velocity increases.  Default: -0.01
 
@@ -83,7 +87,7 @@ func calc_top_speed(input_velocity: Vector3) -> float:
 func move_camera(new_position: Vector3) -> void:
 	camera.global_transform.origin = new_position
 
-func change_state(state: CarStates, velocity_y: float,dir_y: float) -> CarStates:
+func shift_gear(state: CarStates, velocity_y: float,dir_y: float) -> CarStates:
 	match(state):
 		CarStates.DRIVE:
 			if (velocity_y == 0.0 and dir_y == 0.0):
@@ -106,7 +110,7 @@ func change_state(state: CarStates, velocity_y: float,dir_y: float) -> CarStates
 
 	return state
 
-func set_speed(state: CarStates) -> void:
+func get_gear_speed(state: CarStates) -> void:
 	match(state):
 		CarStates.DRIVE:
 			state_max = max_speed
@@ -165,9 +169,9 @@ func _physics_process(delta: float) -> void:
 
 	var prev_velocity = velocity.dot(forward_dir)
 	var prev_state = curr_state
-	curr_state = change_state(curr_state, prev_velocity, -input_dir.z)
+	curr_state = shift_gear(curr_state, prev_velocity, -input_dir.z)
 	if (curr_state != prev_state):
-		set_speed(curr_state)
+		get_gear_speed(curr_state)
 
 	#!! BUG: Turning causes a small amount of friction to be applied to the car every frame, even when net friction is 0
 	var wheel_steering := Vector3.ZERO
