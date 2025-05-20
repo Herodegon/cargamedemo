@@ -39,6 +39,9 @@ var curr_state := CarStates.DRIVE
 var state_max := 30.0
 var state_min := 0.0
 
+## When true, drift is applied to front and back wheels
+var is_handbrake_applied := false
+
 var is_friction_enabled := true
 var is_debug_enabled := false
 
@@ -87,24 +90,24 @@ func calc_top_speed(input_velocity: Vector3) -> float:
 func move_camera(new_position: Vector3) -> void:
 	camera.global_transform.origin = new_position
 
-func shift_gear(state: CarStates, velocity_y: float,dir_y: float) -> CarStates:
+func shift_gear(state: CarStates, velocity_y: float, dir_y: float) -> CarStates:
 	match(state):
 		CarStates.DRIVE:
 			if (velocity_y == 0.0 and dir_y == 0.0):
 				state = CarStates.NEUTRAL
 				print("New State: NEUTRAL")
-			if (velocity_y < 0.0 and dir_y < 0.0):
+			if (velocity_y < 0.0 and dir_y > 0.0):
 				state = CarStates.REVERSE
 				print("New State: REVERSE")
 		CarStates.NEUTRAL:
-			if (dir_y > 0.0):
+			if (dir_y < 0.0):
 				state = CarStates.DRIVE
 				print("New State: DRIVE")
-			elif (dir_y < 0.0):
+			elif (dir_y > 0.0):
 				state = CarStates.REVERSE
 				print("New State: REVERSE")
 		CarStates.REVERSE:
-			if (dir_y >= 0.0):
+			if (dir_y <= 0.0):
 				state = CarStates.NEUTRAL
 				print("New State: NEUTRAL")
 
@@ -125,8 +128,6 @@ func get_gear_speed(state: CarStates) -> void:
 func calc_steering(angle: float, player_turn_dir: Vector3, player_accel_dir: Vector3) -> Vector3:
 	if (curr_state == CarStates.REVERSE):
 		angle *= -1.0
-	# Used to decide car handling at steering angles greater than max_turn_amount (for oversteering and understeering)
-	#var max_turn_amount = (prev_velocity/max_speed) * 0.8
 	var steering_x = player_turn_dir * cos(angle)
 	var steering_y = player_accel_dir * sin(angle)
 	# Turning is perpendicular to and dependent on the direction the car is facing
@@ -165,11 +166,11 @@ func _physics_process(delta: float) -> void:
 	# Calculate forward movement based on the direction the car is facing
 	var forward_dir := -basis.z
 	var accel_dir := input_dir.z * basis.z
-	var turn_dir := input_dir.x * basis.x
+	var turn_dir := input_dir.x * basis.x 
 
 	var prev_velocity = velocity.dot(forward_dir)
 	var prev_state = curr_state
-	curr_state = shift_gear(curr_state, prev_velocity, -input_dir.z)
+	curr_state = shift_gear(curr_state, prev_velocity, input_dir.z)
 	if (curr_state != prev_state):
 		get_gear_speed(curr_state)
 
@@ -178,7 +179,15 @@ func _physics_process(delta: float) -> void:
 	var front_wheel := global_position + (forward_dir * (scale.z/2.0))
 	var back_wheel := global_position - (forward_dir * (scale.z/2.0))
 	if (prev_velocity != 0.0 && !turn_dir.is_zero_approx()):
-		wheel_steering = calc_steering(turn_angle, turn_dir, accel_dir)
+		var angle = turn_angle
+		if (is_handbrake_applied):
+			angle *= -1.0
+		wheel_steering = calc_steering(angle, turn_dir, accel_dir)
+		if (curr_state != CarStates.REVERSE && input_dir.z > 0.0 && is_handbrake_applied == false):
+			print("Drift Time")
+			is_handbrake_applied = true
+	elif (is_handbrake_applied == true):
+		is_handbrake_applied = false
 
 	# Set velocity for each pair of wheels depending on their role
 	front_wheel += (velocity + wheel_steering) * delta
@@ -189,21 +198,15 @@ func _physics_process(delta: float) -> void:
 	var net_friction = Vector3.ZERO
 	if (is_friction_enabled):
 		net_friction = calc_friction(velocity)
-	#var net_friction = Vector3.ZERO
 	velocity = (new_heading * prev_velocity) + (max_acceleration * accel_dir * delta) + (net_friction * delta)
 	
 	var curr_velocity = velocity.dot(forward_dir)
-	var accel_length = accel_dir.dot(basis.z)
 	if (!accel_dir.is_zero_approx()):
-		if (accel_length < 0.0 && curr_velocity > state_max):
-			print("PeePee")
+		if (input_dir.z < 0.0 && curr_velocity > state_max):
 			velocity = velocity.normalized() * abs(state_max)
 		# Ensure that the car does not start at velocity of 0 when shifting to drive
-		elif (accel_length > 0.0 && curr_velocity < state_min):
-			print("PooPoo")
+		elif (input_dir.z > 0.0 && curr_velocity < state_min):
 			velocity = velocity.normalized() * abs(state_min)
-
-	print("Dot Accel: ", accel_dir.dot(basis.z))
 
 	move_camera(camera_offset + global_position + Vector3(0.0, (velocity.length()/max_speed) * 5.0, 0.0))
 	#move_camera((1.0 * camera_offset) + global_position)
