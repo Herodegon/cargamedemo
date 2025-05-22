@@ -41,6 +41,7 @@ var state_min := 0.0
 
 ## When true, drift is applied to front and back wheels
 var is_handbrake_applied := false
+var acceleration_angle := 0.0
 
 var is_friction_enabled := true
 var is_debug_enabled := false
@@ -51,9 +52,9 @@ var is_debug_enabled := false
 @export_group("Movement")
 @export var max_speed := 30.0				# Highest speed possible by max gear. 		  		   Default: 30.0
 @export var min_speed := -10.0				# Lowest speed possible in reverse.   		  		   Default: -10.0
-@export var max_acceleration := 16.0		# Rate of acceleration by the car each frame. 		   Default: 16.0
+@export var max_acceleration := 10.0		# Rate of acceleration by the car each frame. 		   Default: 16.0
 @export var turn_angle := PI/6				# Angle from front wheels where turn force is applied. Default: PI/6
-@export var turn_strength := 1.0			# Magnitude of turn angle. 							   Default: 1.0
+@export var turn_strength := 2.0			# Magnitude of turn angle. 							   Default: 1.0
 @export var spin_angle := PI/6              # Angle from front wheels where spin force is applied. Default: PI/6
 @export var friction := -0.2				# Force to reduce acceleration. 					   Default: -0.2
 @export var drag := -0.01					# Force to reduce acceleration as velocity increases.  Default: -0.01
@@ -165,6 +166,8 @@ func _physics_process(delta: float) -> void:
 
 	# Calculate forward movement based on the direction the car is facing
 	var forward_dir := -basis.z
+	if (is_handbrake_applied):
+		forward_dir = velocity.normalized()
 	var accel_dir := input_dir.z * basis.z
 	var turn_dir := input_dir.x * basis.x 
 
@@ -179,15 +182,13 @@ func _physics_process(delta: float) -> void:
 	var front_wheel := global_position + (forward_dir * (scale.z/2.0))
 	var back_wheel := global_position - (forward_dir * (scale.z/2.0))
 	if (prev_velocity != 0.0 && !turn_dir.is_zero_approx()):
-		var angle = turn_angle
-		if (is_handbrake_applied):
-			angle *= -1.0
-		wheel_steering = calc_steering(angle, turn_dir, accel_dir)
+		wheel_steering = calc_steering(turn_angle, turn_dir, accel_dir)
 		if (curr_state != CarStates.REVERSE && input_dir.z > 0.0 && is_handbrake_applied == false):
 			print("Drift Time")
 			is_handbrake_applied = true
 	elif (is_handbrake_applied == true):
 		is_handbrake_applied = false
+		acceleration_angle = 0.0
 
 	# Set velocity for each pair of wheels depending on their role
 	front_wheel += (velocity + wheel_steering) * delta
@@ -198,7 +199,12 @@ func _physics_process(delta: float) -> void:
 	var net_friction = Vector3.ZERO
 	if (is_friction_enabled):
 		net_friction = calc_friction(velocity)
-	velocity = (new_heading * prev_velocity) + (max_acceleration * accel_dir * delta) + (net_friction * delta)
+	var acceleration_force = max_acceleration * (accel_dir + wheel_steering).normalized() * delta
+	var net_friction_force = net_friction * delta
+	var new_velocity = (new_heading * prev_velocity) + acceleration_force + net_friction_force
+
+	velocity = new_velocity
+	print("Velocity: ", velocity.dot(forward_dir))
 	
 	var curr_velocity = velocity.dot(forward_dir)
 	if (!accel_dir.is_zero_approx()):
@@ -219,11 +225,14 @@ func _physics_process(delta: float) -> void:
 
 	if (is_debug_enabled):
 		var debug_obj := [
-			velocity,
+			#velocity,
+			#handbrake_velocity,
 			#relative_input,
-			accel_dir,
-			turn_dir,
-			wheel_steering,
+			forward_dir,
+			acceleration_force,
+			#accel_dir,
+			#turn_dir,
+			#wheel_steering,
 			#-global_transform.basis.x.normalized(),
 			#-global_transform.basis.z.normalized(),
 		]
