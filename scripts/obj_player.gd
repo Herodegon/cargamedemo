@@ -9,14 +9,26 @@ extends CharacterBody3D
 
 # TODO List:
 ## Features:
+### [X] - Add camera zoom out when accelerating
+### [X] - Add wheel bases
+### [X] - Add wheel steering
+### [X] - Add basic gears (Drive, Neutral, and Reverse)
+### [ ] - Add gear shifting
 ### [ ] - Add drifting mechanic
 ### [ ] - Add jump mechanic
 ### [ ] - Add pitch spin when midair
 ### [ ] - Add yaw spin when midair
 ### [ ] - Add camera shake when accelerating
+### [ ] - Add test weapon
+### [ ] - Add basic enemy
+### [ ] - Add health bar to car class
+### [ ] - Add hitbox and hurtbox to car class
+### [ ] - Add AI to enemy
 ## Bugs:
 ### [X] - Car turning acceleration increases exponentially as difference between car position and velocity decreases
 ### [X] - Near zero pivot point when turning during transition from reverse to drive
+### [ ] - Turning causes a small amount of friction to be applied to the car every frame, even when net friction is 0
+
 
 enum CarStates {
 	DRIVE,
@@ -41,7 +53,7 @@ var state_min := 0.0
 
 ## When true, drift is applied to front and back wheels
 var is_handbrake_applied := false
-var acceleration_angle := 0.0
+var drift_direction := Vector3.ZERO
 
 var is_friction_enabled := true
 var is_debug_enabled := false
@@ -56,6 +68,7 @@ var is_debug_enabled := false
 @export var turn_angle := PI/6				# Angle from front wheels where turn force is applied. Default: PI/6
 @export var turn_strength := 2.0			# Magnitude of turn angle. 							   Default: 1.0
 @export var spin_angle := PI/6              # Angle from front wheels where spin force is applied. Default: PI/6
+@export var rotation_speed := 0.50	        # Rate of rotation of the car when drifting. 		   Default: 0.08
 @export var friction := -0.2				# Force to reduce acceleration. 					   Default: -0.2
 @export var drag := -0.01					# Force to reduce acceleration as velocity increases.  Default: -0.01
 
@@ -166,8 +179,6 @@ func _physics_process(delta: float) -> void:
 
 	# Calculate forward movement based on the direction the car is facing
 	var forward_dir := -basis.z
-	if (is_handbrake_applied):
-		forward_dir = velocity.normalized()
 	var accel_dir := input_dir.z * basis.z
 	var turn_dir := input_dir.x * basis.x 
 
@@ -183,12 +194,13 @@ func _physics_process(delta: float) -> void:
 	var back_wheel := global_position - (forward_dir * (scale.z/2.0))
 	if (prev_velocity != 0.0 && !turn_dir.is_zero_approx()):
 		wheel_steering = calc_steering(turn_angle, turn_dir, accel_dir)
-		if (curr_state != CarStates.REVERSE && input_dir.z > 0.0 && is_handbrake_applied == false):
+		# Begin drifting if the brake is applied while the car is moving forward
+		if (prev_velocity > 0.0 && input_dir.z > 0.0 && is_handbrake_applied == false):
 			print("Drift Time")
 			is_handbrake_applied = true
-	elif (is_handbrake_applied == true):
+			drift_direction = velocity
+	elif (is_handbrake_applied == true && (velocity.normalized() - drift_direction.normalized()).length() < 0.1):
 		is_handbrake_applied = false
-		acceleration_angle = 0.0
 
 	# Set velocity for each pair of wheels depending on their role
 	front_wheel += (velocity + wheel_steering) * delta
@@ -196,16 +208,25 @@ func _physics_process(delta: float) -> void:
 	var new_heading = (front_wheel - back_wheel).normalized()
 
 	# Calculate player velocity
+	var acceleration_force = Vector3.ZERO
+	if (is_handbrake_applied):
+		velocity += max_acceleration * accel_dir.normalized() * delta
+	else:
+		if (prev_velocity < max_acceleration):
+			acceleration_force = max_acceleration * accel_dir.normalized() * delta
+		else:
+			acceleration_force = max_acceleration * (accel_dir + wheel_steering).normalized() * delta
+		velocity = (new_heading * prev_velocity) + acceleration_force
+
+	# Calculate resistance
 	var net_friction = Vector3.ZERO
 	if (is_friction_enabled):
 		net_friction = calc_friction(velocity)
-	var acceleration_force = max_acceleration * (accel_dir + wheel_steering).normalized() * delta
 	var net_friction_force = net_friction * delta
-	var new_velocity = (new_heading * prev_velocity) + acceleration_force + net_friction_force
-
-	velocity = new_velocity
-	print("Velocity: ", velocity.dot(forward_dir))
+	velocity += net_friction_force
+	print("Velocity: ", velocity.length())
 	
+	# Constrain velocity depending on the current gear
 	var curr_velocity = velocity.dot(forward_dir)
 	if (!accel_dir.is_zero_approx()):
 		if (input_dir.z < 0.0 && curr_velocity > state_max):
@@ -219,17 +240,22 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	if (curr_velocity > 0.0):
-		look_at(global_position + velocity)
+		if (is_handbrake_applied):
+			drift_direction = new_heading * drift_direction.length()
+			look_at(global_position + drift_direction)
+		else:
+			look_at(global_position + velocity)
 	elif (curr_velocity < 0.0):
 		look_at(global_position - velocity)
 
 	if (is_debug_enabled):
 		var debug_obj := [
-			#velocity,
-			#handbrake_velocity,
+			velocity,
+			drift_direction,
 			#relative_input,
-			forward_dir,
-			acceleration_force,
+			#forward_dir,
+			#acceleration_force,
+			#net_friction_force,
 			#accel_dir,
 			#turn_dir,
 			#wheel_steering,
