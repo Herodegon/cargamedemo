@@ -29,7 +29,6 @@ extends CharacterBody3D
 ### [X] - Near zero pivot point when turning during transition from reverse to drive
 ### [ ] - Turning causes a small amount of friction to be applied to the car every frame, even when net friction is 0
 
-
 enum CarStates {
 	DRIVE,
 	DRIFT,
@@ -51,12 +50,16 @@ var curr_state := CarStates.DRIVE
 var state_max := 30.0
 var state_min := 0.0
 
+# Target used for car weapon systems
+var weapon_target = null
+
 ## When true, drift is applied to front and back wheels
 var is_handbrake_applied := false
 var drift_direction := Vector3.ZERO
 
 var is_friction_enabled := true
 var is_debug_enabled := false
+var is_paused := false
 
 @export_group("Camera")
 @export var camera_offset := Vector3(0.0,10.0,0.0)
@@ -67,8 +70,8 @@ var is_debug_enabled := false
 @export var max_acceleration := 10.0		# Rate of acceleration by the car each frame. 		   Default: 16.0
 @export var turn_angle := PI/6				# Angle from front wheels where turn force is applied. Default: PI/6
 @export var turn_strength := 2.0			# Magnitude of turn angle. 							   Default: 1.0
+@export var drift_strength := 1.2			# Magnitude of drift angle when handbrake is applied.  Default: 1.0
 @export var spin_angle := PI/6              # Angle from front wheels where spin force is applied. Default: PI/6
-@export var rotation_speed := 0.50	        # Rate of rotation of the car when drifting. 		   Default: 0.08
 @export var friction := -0.2				# Force to reduce acceleration. 					   Default: -0.2
 @export var drag := -0.01					# Force to reduce acceleration as velocity increases.  Default: -0.01
 
@@ -156,6 +159,12 @@ func calc_friction(obj_velocity: Vector3) -> Vector3:
 
 	return net_friction
 
+## Sets position and rotation when player is initialized
+func _init(pos: Vector3 = Vector3(0.0,0.0,0.0), rot: Vector3 = Vector3.FORWARD) -> void:
+	# Initialize car position and rotation
+	position = pos
+	rotation = rot
+
 func _ready() -> void:
 	var top_speed := calc_top_speed(velocity)
 	print("Top Speed: ", top_speed)
@@ -173,103 +182,106 @@ func _physics_process(delta: float) -> void:
 	# Reset debug nodes each frame to prevent clutter
 	clear_debug_nodes()
 
-	# Get raw input from the player
-	var raw_dir := Input.get_vector("turn_left", "turn_right", "brake", "accelerate")
-	var input_dir := Vector3(raw_dir.x, 0.0, -raw_dir.y)
+	if (!is_paused):
+		# Get raw input from the player
+		var raw_dir := Input.get_vector("turn_left", "turn_right", "brake", "accelerate")
+		var input_dir := Vector3(raw_dir.x, 0.0, -raw_dir.y)
 
-	# Calculate forward movement based on the direction the car is facing
-	var forward_dir := -basis.z
-	var accel_dir := input_dir.z * basis.z
-	var turn_dir := input_dir.x * basis.x 
+		# Calculate forward movement based on the direction the car is facing
+		var forward_dir := -basis.z
+		var accel_dir := input_dir.z * basis.z
+		var turn_dir := input_dir.x * basis.x 
 
-	var prev_velocity = velocity.dot(forward_dir)
-	var prev_state = curr_state
-	curr_state = shift_gear(curr_state, prev_velocity, input_dir.z)
-	if (curr_state != prev_state):
-		get_gear_speed(curr_state)
+		var prev_velocity = velocity.dot(forward_dir)
+		var prev_state = curr_state
+		curr_state = shift_gear(curr_state, prev_velocity, input_dir.z)
+		if (curr_state != prev_state):
+			get_gear_speed(curr_state)
 
-	#!! BUG: Turning causes a small amount of friction to be applied to the car every frame, even when net friction is 0
-	var wheel_steering := Vector3.ZERO
-	var front_wheel := global_position + (forward_dir * (scale.z/2.0))
-	var back_wheel := global_position - (forward_dir * (scale.z/2.0))
-	if (prev_velocity != 0.0 && !turn_dir.is_zero_approx()):
-		wheel_steering = calc_steering(turn_angle, turn_dir, accel_dir)
-		# Begin drifting if the brake is applied while the car is moving forward
-		if (prev_velocity > 0.0 && input_dir.z > 0.0 && is_handbrake_applied == false):
-			print("Drift Time")
-			is_handbrake_applied = true
-			drift_direction = velocity
-	elif (is_handbrake_applied == true && (velocity.normalized() - drift_direction.normalized()).length() < 0.1):
-		is_handbrake_applied = false
+		#!! BUG: Turning causes a small amount of friction to be applied to the car every frame, even when net friction is 0
+		var wheel_steering := Vector3.ZERO
+		var front_wheel := global_position + (forward_dir * (scale.z/2.0))
+		var back_wheel := global_position - (forward_dir * (scale.z/2.0))
+		if (prev_velocity != 0.0 && !turn_dir.is_zero_approx()):
+			wheel_steering = calc_steering(turn_angle, turn_dir, accel_dir)
+			# Begin drifting if the brake is applied while the car is moving forward
+			if (prev_velocity > 0.0 && input_dir.z > 0.0 && is_handbrake_applied == false):
+				print("Drift Time")
+				is_handbrake_applied = true
+				drift_direction = velocity
+		elif (is_handbrake_applied == true && (velocity.normalized() - drift_direction.normalized()).length() < 0.1):
+			is_handbrake_applied = false
 
-	# Set velocity for each pair of wheels depending on their role
-	front_wheel += (velocity + wheel_steering) * delta
-	back_wheel += velocity * delta
-	var new_heading = (front_wheel - back_wheel).normalized()
+		# Set velocity for each pair of wheels depending on their role
+		front_wheel += (velocity + wheel_steering) * delta
+		back_wheel += velocity * delta
+		var new_heading = (front_wheel - back_wheel).normalized()
 
-	# Calculate player velocity
-	var acceleration_force = Vector3.ZERO
-	if (is_handbrake_applied):
-		velocity += max_acceleration * accel_dir.normalized() * delta
-	else:
-		if (prev_velocity < max_acceleration):
-			acceleration_force = max_acceleration * accel_dir.normalized() * delta
-		else:
-			acceleration_force = max_acceleration * (accel_dir + wheel_steering).normalized() * delta
-		velocity = (new_heading * prev_velocity) + acceleration_force
-
-	# Calculate resistance
-	var net_friction = Vector3.ZERO
-	if (is_friction_enabled):
-		net_friction = calc_friction(velocity)
-	var net_friction_force = net_friction * delta
-	velocity += net_friction_force
-	print("Velocity: ", velocity.length())
-	
-	# Constrain velocity depending on the current gear
-	var curr_velocity = velocity.dot(forward_dir)
-	if (!accel_dir.is_zero_approx()):
-		if (input_dir.z < 0.0 && curr_velocity > state_max):
-			velocity = velocity.normalized() * abs(state_max)
-		# Ensure that the car does not start at velocity of 0 when shifting to drive
-		elif (input_dir.z > 0.0 && curr_velocity < state_min):
-			velocity = velocity.normalized() * abs(state_min)
-
-	move_camera(camera_offset + global_position + Vector3(0.0, (velocity.length()/max_speed) * 5.0, 0.0))
-	#move_camera((1.0 * camera_offset) + global_position)
-
-	move_and_slide()
-	if (curr_velocity > 0.0):
+		# Calculate player velocity
+		var acceleration_force = Vector3.ZERO
 		if (is_handbrake_applied):
-			drift_direction = new_heading * drift_direction.length()
-			look_at(global_position + drift_direction)
+			velocity += (max_acceleration * drift_strength) * accel_dir.normalized() * delta
 		else:
-			look_at(global_position + velocity)
-	elif (curr_velocity < 0.0):
-		look_at(global_position - velocity)
+			if (prev_velocity < max_acceleration && prev_velocity != 0.0):
+				acceleration_force = max_acceleration * accel_dir.normalized() * delta
+			else:
+				acceleration_force = max_acceleration * (accel_dir + wheel_steering).normalized() * delta
+			velocity = (new_heading * prev_velocity) + acceleration_force
 
-	if (is_debug_enabled):
-		var debug_obj := [
-			velocity,
-			drift_direction,
-			#relative_input,
-			#forward_dir,
-			#acceleration_force,
-			#net_friction_force,
-			#accel_dir,
-			#turn_dir,
-			#wheel_steering,
-			#-global_transform.basis.x.normalized(),
-			#-global_transform.basis.z.normalized(),
-		]
+		# Calculate resistance
+		var net_friction = Vector3.ZERO
+		if (is_friction_enabled):
+			net_friction = calc_friction(velocity)
+		var net_friction_force = net_friction * delta
+		velocity += net_friction_force
+		
+		# Constrain velocity depending on the current gear
+		var curr_velocity = velocity.dot(forward_dir)
+		if (!accel_dir.is_zero_approx()):
+			if (input_dir.z < 0.0 && curr_velocity > state_max):
+				velocity = velocity.normalized() * abs(state_max)
+			# Ensure that the car does not start at velocity of 0 when shifting to drive
+			elif (input_dir.z > 0.0 && curr_velocity < state_min):
+				velocity = velocity.normalized() * abs(state_min)
 
-		draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),debug_obj,debug_colors)
+		move_camera(camera_offset + global_position + Vector3(0.0, (velocity.length()/max_speed) * 5.0, 0.0))
 
-		# Display the front and back wheels
-		draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[front_wheel - global_position],[Color.GRAY])
-		draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[back_wheel - global_position],[Color.WHITE])
+		move_and_slide()
+		if (velocity.length() > 0.0):
+			if (is_handbrake_applied):
+				# Not sure if drift_direction.length() is better than velocity.length() for this purpose.
+				# Either should work, but further testing is is required.
+				drift_direction = new_heading * velocity.length()
+				look_at(global_position + drift_direction)
+			else:
+				look_at(global_position + velocity)
+		elif (curr_velocity < 0.0):
+			look_at(global_position - velocity)
 
-		# Display turning circles
-		var turn_velocity = velocity.length()/turn_strength
-		draw_debug_circles(global_position + (basis.x * turn_velocity),[turn_velocity],[Color.YELLOW])
-		draw_debug_circles(global_position - (basis.x * turn_velocity),[turn_velocity],[Color.GREEN])
+		print("Velocity: ", velocity.length())
+
+		if (is_debug_enabled):
+			var debug_obj := [
+				velocity,
+				drift_direction,
+				#relative_input,
+				#forward_dir,
+				#acceleration_force,
+				#net_friction_force,
+				#accel_dir,
+				#turn_dir,
+				#wheel_steering,
+				#-global_transform.basis.x.normalized(),
+				#-global_transform.basis.z.normalized(),
+			]
+
+			draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),debug_obj,debug_colors)
+
+			# Display the front and back wheels
+			draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[front_wheel - global_position],[Color.GRAY])
+			draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[back_wheel - global_position],[Color.WHITE])
+
+			# Display turning circles
+			var turn_velocity = velocity.length()/turn_strength
+			draw_debug_circles(global_position + (basis.x * turn_velocity),[turn_velocity],[Color.YELLOW])
+			draw_debug_circles(global_position - (basis.x * turn_velocity),[turn_velocity],[Color.GREEN])

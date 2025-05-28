@@ -1,0 +1,18 @@
+[gd_scene load_steps=5 format=3 uid="uid://bbkj8fcu6vi7o"]
+
+[ext_resource type="PackedScene" uid="uid://lnlrcyj7p2oo" path="res://scenes/obj_cube.tscn" id="1_3x27y"]
+[ext_resource type="Texture2D" uid="uid://dbatwg23fm1ss" path="res://icon.svg" id="1_im7wb"]
+[ext_resource type="Shader" uid="uid://dk6686g1yacb0" path="res://scripts/shader_test.gdshader" id="2_sju7m"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fthar"]
+shader = ExtResource("2_sju7m")
+
+[node name="ObjShaderTest" type="Node"]
+
+[node name="Shader3DTest" parent="." instance=ExtResource("1_3x27y")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0.5)
+
+[node name="Shader2DTest" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_fthar")
+position = Vector2(64, 64)
+texture = ExtResource("1_im7wb")
