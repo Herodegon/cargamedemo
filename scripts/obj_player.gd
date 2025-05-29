@@ -159,12 +159,6 @@ func calc_friction(obj_velocity: Vector3) -> Vector3:
 
 	return net_friction
 
-## Sets position and rotation when player is initialized
-func _init(pos: Vector3 = Vector3(0.0,0.0,0.0), rot: Vector3 = Vector3.FORWARD) -> void:
-	# Initialize car position and rotation
-	position = pos
-	rotation = rot
-
 func _ready() -> void:
 	var top_speed := calc_top_speed(velocity)
 	print("Top Speed: ", top_speed)
@@ -244,7 +238,10 @@ func _physics_process(delta: float) -> void:
 			elif (input_dir.z > 0.0 && curr_velocity < state_min):
 				velocity = velocity.normalized() * abs(state_min)
 
-		move_camera(camera_offset + global_position + Vector3(0.0, (velocity.length()/max_speed) * 5.0, 0.0))
+		##! FEATURE: Add lag to camera movement, making the car appear faster than it is
+		var camera_lag = net_friction_force.normalized() * (velocity.length()/max_speed) * 1.5
+		var camera_zoom = (velocity.length()/max_speed) * 5.0
+		move_camera(camera_offset + global_position + camera_lag + Vector3(0.0, camera_zoom, 0.0))
 
 		move_and_slide()
 		if (velocity.length() > 0.0):

@@ -1,21 +1,28 @@
 [gd_scene load_steps=6 format=3 uid="uid://b1ay0ep3pxx8l"]
 
-[ext_resource type="Script" uid="uid://ce2cjvsigsh58" path="res://scenes/game.gd" id="1_lnu2h"]
+[ext_resource type="Script" uid="uid://ce2cjvsigsh58" path="res://scripts/game.gd" id="1_lnu2h"]
 [ext_resource type="PackedScene" uid="uid://lnlrcyj7p2oo" path="res://scenes/obj_cube.tscn" id="1_yqjtg"]
 
 [sub_resource type="Environment" id="Environment_yqjtg"]
+background_mode = 1
+background_color = Color(0.345098, 0.298039, 0.564706, 1)
+ambient_light_source = 1
 
-[sub_resource type="CameraAttributesPhysical" id="CameraAttributesPhysical_lnu2h"]
+[sub_resource type="CameraAttributesPractical" id="CameraAttributesPractical_yqjtg"]
 
-[sub_resource type="Compositor" id="Compositor_lbhrr"]
+[sub_resource type="Compositor" id="Compositor_yqjtg"]
 
 [node name="Game" type="Node3D"]
 script = ExtResource("1_lnu2h")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_yqjtg")
-camera_attributes = SubResource("CameraAttributesPhysical_lnu2h")
-compositor = SubResource("Compositor_lbhrr")
+camera_attributes = SubResource("CameraAttributesPractical_yqjtg")
+compositor = SubResource("Compositor_yqjtg")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 30, 15)
+sky_mode = 1
 
 [node name="ObjCube" parent="." instance=ExtResource("1_yqjtg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.98462, 0, -3.7778)
@@ -58,6 +65,3 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24.8669, 0, 10.7746)
 
 [node name="ObjCube14" parent="." instance=ExtResource("1_yqjtg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 28.1375, 0, -11.1337)
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 30, 15)

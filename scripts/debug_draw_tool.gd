@@ -30,7 +30,7 @@ func circle(pos: Vector3, radius: float, color: Color = Color.WHITE_SMOKE) -> Me
     circle_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
     circle_mesh.surface_begin(Mesh.PRIMITIVE_LINES, material)
-    for i in range(0, 360, 1):
+    for i in range(0, 360, 10):
         var angle := deg_to_rad(i)
         var x := radius * cos(angle)
         var z := radius * sin(angle)
