@@ -6,6 +6,10 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_fthar"]
 shader = ExtResource("2_sju7m")
+shader_parameter/center = Vector2(0.5, 0.5)
+shader_parameter/radius = 0.5
+shader_parameter/speed = 1.0
+shader_parameter/enable_demo_mode = true
 
 [node name="ObjShaderTest" type="Node"]
 
@@ -15,4 +19,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0.5)
 [node name="Shader2DTest" type="Sprite2D" parent="."]
 material = SubResource("ShaderMaterial_fthar")
 position = Vector2(64, 64)
+texture = ExtResource("1_im7wb")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(192, 64)
 texture = ExtResource("1_im7wb")
