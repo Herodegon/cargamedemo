@@ -13,8 +13,9 @@ extends CharacterBody3D
 ### [X] - Add wheel bases
 ### [X] - Add wheel steering
 ### [X] - Add basic gears (Drive, Neutral, and Reverse)
-### [ ] - Add gear shifting
-### [ ] - Add drifting mechanic
+### [ ] - Add gear shifting (Does this add anything meaningful to the experience?)
+### [X] - Add drifting mechanic
+### [X] - Add wheels to car
 ### [ ] - Add jump mechanic
 ### [ ] - Add pitch spin when midair
 ### [ ] - Add yaw spin when midair
@@ -76,6 +77,9 @@ var is_paused := false
 @export var drag := -0.01					# Force to reduce acceleration as velocity increases.  Default: -0.01
 
 @onready var camera := $Camera3D
+
+@onready var wheels_front := $WheelsFront.get_children()
+@onready var wheels_back := $WheelsBack.get_children()
 
 ## Creates 3D lines in real time for visualizing velocity, acceleration, position, etc.
 ## Meshes instantiated are added to the root tree, and must be managed/freed manually
@@ -239,9 +243,9 @@ func _physics_process(delta: float) -> void:
 				velocity = velocity.normalized() * abs(state_min)
 
 		##! FEATURE: Add lag to camera movement, making the car appear faster than it is
-		var camera_lag = net_friction_force.normalized() * (velocity.length()/max_speed) * 1.5
+		#var camera_lag = net_friction_force.normalized() * (velocity.length()/max_speed) * 1.5
 		var camera_zoom = (velocity.length()/max_speed) * 5.0
-		move_camera(camera_offset + global_position + camera_lag + Vector3(0.0, camera_zoom, 0.0))
+		move_camera(camera_offset + global_position + Vector3(0.0, camera_zoom, 0.0))
 
 		move_and_slide()
 		if (velocity.length() > 0.0):
@@ -255,7 +259,11 @@ func _physics_process(delta: float) -> void:
 		elif (curr_velocity < 0.0):
 			look_at(global_position - velocity)
 
-		print("Velocity: ", velocity.length())
+		# Turn wheels if steering
+		for wheel in wheels_front:
+			var wheel_current_angle = wheel.rotation.y
+			var wheel_target_angle = sign(-input_dir.x) * abs(atan2(sin(wheel_steering.x), cos(wheel_steering.z)+(PI/4.0)))
+			wheel.rotation.y = lerp_angle(wheel_current_angle, wheel_target_angle, 0.25)
 
 		if (is_debug_enabled):
 			var debug_obj := [
@@ -277,6 +285,16 @@ func _physics_process(delta: float) -> void:
 			# Display the front and back wheels
 			draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[front_wheel - global_position],[Color.GRAY])
 			draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),[back_wheel - global_position],[Color.WHITE])
+
+			# Display wheel positions relative to car
+			var debug_wheels := [
+				wheels_front[0].global_position - global_position,
+				wheels_front[1].global_position - global_position,
+				wheels_back[0].global_position - global_position,
+				wheels_back[1].global_position - global_position
+			]
+
+			draw_debug_lines(global_position + Vector3(0.0,5.0,0.0),debug_wheels,debug_colors)
 
 			# Display turning circles
 			var turn_velocity = velocity.length()/turn_strength
