@@ -16,6 +16,8 @@ extends CharacterBody3D
 ### [ ] - Add gear shifting (Does this add anything meaningful to the experience?)
 ### [X] - Add drifting mechanic
 ### [X] - Add wheels to car
+### [ ] - Fix world lighting
+### [ ] - Add stencil shader for world objects
 ### [ ] - Add jump mechanic
 ### [ ] - Add pitch spin when midair
 ### [ ] - Add yaw spin when midair
@@ -245,6 +247,7 @@ func _physics_process(delta: float) -> void:
 		##! FEATURE: Add lag to camera movement, making the car appear faster than it is
 		#var camera_lag = net_friction_force.normalized() * (velocity.length()/max_speed) * 1.5
 		var camera_zoom = (velocity.length()/max_speed) * 5.0
+		#var camera_zoom = -3.0
 		move_camera(camera_offset + global_position + Vector3(0.0, camera_zoom, 0.0))
 
 		move_and_slide()
@@ -262,8 +265,10 @@ func _physics_process(delta: float) -> void:
 		# Turn wheels if steering
 		for wheel in wheels_front:
 			var wheel_current_angle = wheel.rotation.y
-			var wheel_target_angle = sign(-input_dir.x) * abs(atan2(sin(wheel_steering.x), cos(wheel_steering.z)+(PI/4.0)))
+			var wheel_target_angle = sign(-input_dir.x) * abs(atan2(sin(PI/6.0), cos(PI/6.0)))
 			wheel.rotation.y = lerp_angle(wheel_current_angle, wheel_target_angle, 0.25)
+
+			wheel.mesh.material.set("shader_parameter/speed", velocity.length()/max_speed)
 
 		if (is_debug_enabled):
 			var debug_obj := [
@@ -275,7 +280,7 @@ func _physics_process(delta: float) -> void:
 				#net_friction_force,
 				#accel_dir,
 				#turn_dir,
-				#wheel_steering,
+				wheel_steering,
 				#-global_transform.basis.x.normalized(),
 				#-global_transform.basis.z.normalized(),
 			]

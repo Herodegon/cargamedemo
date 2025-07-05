@@ -22,7 +22,6 @@ compositor = SubResource("Compositor_yqjtg")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 30, 15)
-sky_mode = 1
 
 [node name="ObjCube" parent="." instance=ExtResource("1_yqjtg")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.98462, 0, -3.7778)

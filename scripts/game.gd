@@ -23,7 +23,6 @@ func _ready() -> void:
     # Initialize game scene
     var player = objects["ObjPlayer"].instantiate()
     player.position = Vector3.ZERO
-    player.rotation = Vector3.FORWARD
     add_child(player)
 
 func _process(delta: float) -> void:
